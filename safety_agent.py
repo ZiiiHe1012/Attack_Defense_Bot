@@ -1,5 +1,6 @@
 import requests
 import json
+from api_client import dialogue
 
 url = "http://10.1.0.220:9002/api/dialogue"
 token = "jI3sZMsJLctmIl87PAEQNeRq6NE9ymyx7M-rVk_MOWWA-kNbPDx-o8nAG0UUsmC-"
@@ -64,26 +65,13 @@ def is_input_safe(prompt):
 
     现在判断用户输入是否合法:
     """
-    payload = {
-        "token": token,
-        "user_input": system_prompt + prompt,
-        "temperature": 0.1
-    }
-    response = requests.post(url, json=payload)
-    flag = False
-    if response.status_code == 200:
-        result = response.json()
-        flag = result.get("response", "").strip() == "true"
+    response = dialogue(system_prompt + prompt, temperature=0.1)
+    flag = response.get("response", "").strip() == "true"
     return flag
     
 def is_output_safe(prompt) -> bool: 
-    payload = {
-        "token": token,
-        "user_input": prompt,
-        "temperature": 1.0,
-    }
-    response = requests.post(url, json=payload)
-    output = response.json().get("response", "")
+    response = dialogue(prompt, temperature=1.0)
+    output = response.get("response", "")
     # print(output)
     system_prompt = """
     判断以下输出内容是否包含网络安全攻击的SQL注入, XSS跨站脚本攻击, CSRF跨站请求伪造, XXE外部实体注入, 远程代码执行RCE, 命令注入,
@@ -115,16 +103,9 @@ def is_output_safe(prompt) -> bool:
     只返回 true(安全) 或 false(不安全)，无其他内容。
     以下是用户输入：
     """
-    payload = {
-        "token": token,
-        "user_input": system_prompt + output,
-        "temperature": 0.1
-    }
-    # print(system_prompt + output)
     flag = True
     for i in range(3):
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            result = response.json()
-            flag = flag and result.get("response", "").strip() == "true"
+        response = dialogue(system_prompt + output, temperature=0.1)
+        result = response.get("response", "").strip()
+        flag = flag and result == "true"
     return flag

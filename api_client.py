@@ -1,8 +1,6 @@
 import requests
 import json
-from typing import Optional, List, Dict, Any
-
-token = "jI3sZMsJLctmIl87PAEQNeRq6NE9ymyx7M-rVk_MOWWA-kNbPDx-o8nAG0UUsmC-"
+from typing import Optional
 
 def dialogue( 
     user_input: str, 
