@@ -23,7 +23,6 @@ Given the user's question and several retrieved documents, you are expected to a
 """
 
 def build_prompt(documents,query):
-    prompt=f"""Retrieved documents:{'\n\n'.join(documents)}
-    user's question:{query}"""
-
+    text = '\n\n'.join(documents)
+    prompt = f"Retrieved documents:{text}user's question:{query}"
     return prompt
