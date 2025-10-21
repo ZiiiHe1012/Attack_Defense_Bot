@@ -12,7 +12,6 @@ def dialogue(
 ) -> dict:
     
     url = "http://10.1.0.220:9002/api/dialogue"
-    token = "jI3sZMsJLctmIl87PAEQNeRq6NE9ymyx7M-rVk_MOWWA-kNbPDx-o8nAG0UUsmC-"
 
     payload = {
         "token": token,
