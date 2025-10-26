@@ -1,0 +1,15 @@
+
+# 基础依赖
+requests>=2.31.0
+
+# 可视化前端
+gradio>=4.0.0
+
+# 数据处理
+numpy>=1.24.0
+
+pytest>=7.4.0
+pytest-mock>=3.11.0
+
+black>=23.0.0
+pylint>=2.17.0
