@@ -1,120 +1,98 @@
-## 2025.10.21
-添加了基本的`RAG`与`Security`内容。`RAG`层面，模型可在共享数据库中进行相似文本的检索，同时拼接检索内容生成最终`prompt`；`Security`层面，模型可针对用户输入进行黑名单过滤，同时利用`AI`，使用`few-shot prompting`针对生成的最终`prompt`进行安全性检查，随后先尝试让模型给出回复，再利用`custom_prompt`进行三轮检查，最终判断输出的安全性。
+# 项目逻辑框架分析
 
-## 2025.10.27
-添加了前后端内容，方便用户进行使用。前端采用传统的html+css+javaScript架构，后端采用flask框架开发。
-
-## 项目结构图
+## 一、整体架构
 ```
-attack_defense_bot/                     # 项目根目录
-├── README.md                           # 项目说明文档
-├── requirement.txt                     # Python依赖包列表
-│
-├── __init__.py                         # Python包初始化文件
-├── config.py                           # 配置文件
-├── utils.py                            # 通用工具函数
-│
-├── main.py                             # 主程序入口
-│   └── 功能：协调整个RAG流程
-│       ├── 1. 接收用户输入
-│       ├── 2. 调用 guard.validate_user_input() 进行输入验证
-│       ├── 3. 调用 data_processor.search_common_database() 检索相关文档
-│       ├── 4. 调用 prompt_builder.build_prompt() 构建提示词
-│       ├── 5. 调用 guard.validate_prompt() 进行提示词验证
-│       └── 6. 调用 conversation.answerLM() 生成最终回答
-│
-├── api_client.py                       # API接口封装层
-│   ├── dialogue()                      # LLM对话接口
-│   │   ├── 参数：user_input, custom_prompt, temperature, max_tokens
-│   │   ├── 接口：POST http://10.1.0.220:9002/api/dialogue
-│   │   └── 返回：模型生成的回答
-│   └── search_similar_files()          # 向量数据库检索接口
-│       ├── 参数：database_name, token, query, top_k, metric_type等
-│       ├── 接口：POST http://10.1.0.220:9002/api/databases/{database_name}/search
-│       └── 返回：相似度最高的top_k个文档
-│
-├── guard.py                            # 安全检测模块（统一入口）
-│   ├── validate_user_input()           # 用户输入安全验证
-│   │   ├── 调用 blacklist.get_blacklist() 获取黑名单
-│   │   └── 检查输入是否包含恶意关键词
-│   └── validate_prompt()               # 提示词安全验证
-│       ├── 调用 safety_agent.is_input_safe() 检测输入安全性
-│       └── 调用 safety_agent.is_output_safe() 检测输出安全性
-│
-├── blacklist.py                        # 黑名单配置模块
-│   ├── Blacklist类                     # 黑名单规则定义
-│   │   ├── INSTRUCTION_OVERRIDE        # 指令覆盖攻击关键词
-│   │   ├── ROLE_CONFUSION              # 角色混淆攻击关键词
-│   │   ├── INFORMATION_LEAK            # 信息泄露攻击关键词
-│   │   ├── JAILBREAK                   # 越狱攻击关键词
-│   │   ├── CODE_INJECTION              # 代码注入攻击模式
-│   │   └── SOCIAL_ENGINEERING          # 社会工程攻击关键词
-│   └── get_blacklist()                 # 获取完整黑名单字典
-│
-├── safety_agent.py                     # AI驱动的安全检测模块
-│   ├── INPUT_CHECKING_PROMPT           # 输入检测的系统提示词
-│   ├── OUTPUT_CHECKING_PROMPT          # 输出检测的系统提示词
-│   ├── is_input_safe()                 # 使用LLM判断输入是否安全
-│   │   ├── 调用 api_client.dialogue() 
-│   │   └── 返回 true/false
-│   └── is_output_safe()                # 使用LLM判断输出是否包含攻击内容
-│       ├── 先调用 dialogue() 生成输出
-│       ├── 再调用3次 dialogue() 检测输出安全性
-│       └── 返回 true/false
-│
-├── data_processor.py                   # 数据处理模块
-│   └── search_common_database()        # 从通用知识库检索文档
-│       ├── 调用 api_client.search_similar_files()
-│       ├── 参数：查询文本q, 返回数量topk
-│       └── 返回：文档文本列表
-│
-├── prompt_builder.py                   # 提示词构建模块
-│   ├── RAG_ANSWER_PROMPT               # RAG系统提示词常量
-│   │   └── 定义：助手角色、任务目标、回答要求
-│   └── build_prompt()                  # 构建完整的用户提示词
-│       ├── 参数：检索到的文档列表, 用户查询
-│       └── 返回：格式化的提示词字符串
-│
-└── conversation.py                     # 对话管理模块
-    └── answerLM()                      # 调用LLM生成回答
-        ├── 参数：user_prompt（用户提示词）, system_prompt（系统提示词）
-        ├── 调用 api_client.dialogue()
-        └── 返回：模型回答文本
-
-═══════════════════════════════════════════════════════════════
-
-【模块依赖关系图】
-
-main.py (主流程)
-    ├──> guard.py (安全检测)
-    │       ├──> blacklist.py (关键词黑名单)
-    │       └──> safety_agent.py (AI安全检测)
-    │               └──> api_client.py (调用LLM判断)
-    ├──> data_processor.py (文档检索)
-    │       └──> api_client.py (调用向量数据库)
-    ├──> prompt_builder.py (提示词构建)
-    └──> conversation.py (生成回答)
-            └──> api_client.py (调用LLM对话)
-
-api_client.py (底层服务)
-    ├──> 外部LLM服务 (10.1.0.220:9002/api/dialogue)
-    └──> 外部向量数据库 (10.1.0.220:9002/api/databases/*/search)
-
-═══════════════════════════════════════════════════════════════
-
-【执行流程】
-
-用户输入 
-    ↓
-[步骤1] guard.validate_user_input() - 黑名单过滤
-    ↓
-[步骤2] data_processor.search_common_database() - 检索相关文档
-    ↓
-[步骤3] prompt_builder.build_prompt() - 组装提示词
-    ↓
-[步骤4] guard.validate_prompt() - AI安全检测（输入+输出）
-    ↓
-[步骤5] conversation.answerLM() - 生成最终回答
-    ↓
-输出结果
+AI安全知识问答系统
+├── 前端层（用户交互）
+│   ├── 静态资源（CSS/JS）
+│   └── 模板页面（index.html）
+├── 应用层（Flask服务）
+│   ├── 路由处理
+│   └── 核心业务逻辑
+├── 功能模块层
+│   ├── 安全检测模块
+│   ├── 意图识别模块
+│   ├── 数据检索模块
+│   ├── 提示词构建模块
+│   └── 回答生成模块
+└── 外部依赖
+    └── 第三方API服务（对话/检索）
 ```
+
+## 二、核心流程（main.py）
+
+### 1. 入口点
+- 启动Flask应用：`app.run()`
+- 核心路由：`/chat`（处理用户查询）
+
+### 2. 核心处理函数：`process_query(q: str) -> dict`
+六层安全检测流程的调用链条：
+
+```mermaid
+graph TD
+    A[用户输入] --> B[智能黑名单检测]
+    B -->|通过| C[意图识别]
+    C -->|直接放行| D[RAG检索]
+    C -->|直接拦截| Z[返回错误]
+    C -->|灰色地带| E[AI安全检测]
+    E -->|通过| D
+    D --> F[构建Prompt]
+    F --> G[生成回答]
+    G --> H[输出安全检测]
+    H -->|通过| I[返回成功结果]
+    H -->|失败| Z
+```
+
+#### 各步骤详情：
+1. **黑名单检测**
+   - 调用：`validate_user_input(q)`（来自guard.py）
+   - 功能：过滤已知不安全输入
+
+2. **意图识别**
+   - 调用：`classify_intent(q)` 和 `validate_by_intent(q)`（来自intent_classifier.py）
+   - 功能：分类用户意图（知识学习/攻击实施/防御实践/灰色地带）并判断处理策略
+
+3. **AI安全检测（灰色地带）**
+   - 调用：`is_input_safe(q)`（来自safety_agent.py）
+   - 功能：对模糊意图进行二次安全校验
+
+4. **RAG检索**
+   - 调用：`search_common_database(q, 5)`（来自data_processor.py）
+   - 功能：从知识库检索相关文档
+
+5. **构建Prompt**
+   - 调用：`build_prompt_v2(documents, q, intent_result)`（来自prompt_builder.py）
+   - 功能：结合检索文档和意图信息生成提示词
+
+6. **生成回答**
+   - 调用：`answerLM(user_prompt, RAG_ANSWER_PROMPT_V2)`（来自conversation.py）
+   - 内部调用：`dialogue()`（来自api_client.py，对接外部LLM服务）
+
+7. **输出安全检测**
+   - 调用：`is_output_safe(answer, intent_result)`（来自safety_agent.py）
+   - 功能：验证生成内容的安全性
+
+## 三、关键模块功能
+
+| 模块文件 | 核心功能 | 主要函数 |
+|---------|---------|---------|
+| intent_classifier.py | 意图分类与验证 | classify_intent()、validate_by_intent() |
+| data_processor.py | 知识库检索 | search_common_database() |
+| prompt_builder.py | 动态构建提示词 | build_prompt_v2() |
+| conversation.py | 调用LLM生成回答 | answerLM() |
+| api_client.py | 外部API调用 | dialogue()、search_similar_files() |
+| guard.py | 输入安全校验 | validate_user_input() |
+| safety_agent.py | 输入/输出安全检测 | is_input_safe()、is_output_safe() |
+
+## 四、用户交互流程
+1. 用户通过前端页面（index.html）输入问题
+2. 前端发送请求到`/chat`接口
+3. 后端执行`process_query()`处理流程
+4. 返回处理结果（回答或错误信息）
+5. 前端渲染结果（使用marked.js和highlight.js处理格式）
+
+## 五、安全控制
+- 多层输入过滤（黑名单+意图识别+AI检测）
+- 输出内容安全校验
+- 基于意图的差异化回答策略
+- 限制攻击代码/恶意内容的生成与返回

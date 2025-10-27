@@ -91,7 +91,7 @@ async function sendMessage() {
         setLoading(false);
 
         if (data.success) {
-            addMessage(data.response, 'bot');
+            addMessage(data.answer, 'bot');
         } else {
             addErrorMessage(data.error || '发生未知错误');
         }
