@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
-from prompt_builder import build_prompt, RAG_ANSWER_PROMPT
-from data_processor import search_common_database
+from prompt_builder import build_prompt, RAG_ANSWER_PROMPT,RAG_ADVANCED_ANSWER_PROMPT
+from data_processor import search_common_database,advanced_search
 from conversation import answerLM
 from guard import validate_user_input, validate_prompt
 
@@ -30,12 +30,16 @@ def chat():
                 'success': False,
                 'error': '检测到不安全的输入内容,请修改后重试。'
             })
-        
+        # Advanced Rag pipeline, integrated into one entry function(this version i put single round query decomposition)
+        supplement=advanced_search(message,'decomposition')
+
         # 从知识库检索相关文档
-        documents = search_common_database(message, 5)
-        
+        L1_documents = search_common_database(message, 5)
+
+        #Advanced Rag pipeline, integrated into one entry function(this version i put single round query decomposition)
+
         # 构建增强提示词
-        user_prompt = build_prompt(documents, message)
+        user_prompt = build_prompt(L1_documents, message,supplement)
         
         # 提示词安全验证
         if not validate_prompt(user_prompt):
@@ -45,8 +49,8 @@ def chat():
             })
         
         # 调用大模型生成回答
-        response = answerLM(user_prompt, RAG_ANSWER_PROMPT)
-        
+        response = answerLM(user_prompt, RAG_ADVANCED_ANSWER_PROMPT)
+        print(user_prompt)
         return jsonify({
             'success': True,
             'response': response
