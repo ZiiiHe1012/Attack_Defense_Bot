@@ -15,13 +15,13 @@ function addMessage(content, type = 'bot') {
     const iconText = type === 'user' ? '👤' : '🤖';
     const headerText = type === 'user' ? '您' : 'AI助手';
 
-    // 对于 bot 消息，使用 Markdown 渲染
+    // 对于bot消息，使用Markdown渲染
     let messageContent;
     if (type === 'bot') {
-        // 配置 marked 选项
+        // 配置marked选项
         marked.setOptions({
             breaks: true,  // 支持换行
-            gfm: true,     // 支持 GitHub Flavored Markdown
+            gfm: true,     // 支持GitHub Flavored Markdown
             highlight: function(code, lang) {
                 // 代码高亮
                 if (lang && hljs.getLanguage(lang)) {
@@ -34,7 +34,7 @@ function addMessage(content, type = 'bot') {
         });
         messageContent = marked.parse(content);
     } else {
-        // 用户消息保持纯文本，但转义 HTML
+        // 用户消息保持纯文本，但转义HTML
         messageContent = content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
     }
 
