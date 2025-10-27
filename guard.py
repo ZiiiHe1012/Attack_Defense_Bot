@@ -18,7 +18,6 @@ def validate_user_input(user_input):
 def validate_user_input_smart(user_input):
     """
     智能黑名单：只检查高危组合模式
-    单个安全术语不再拦截
     """
     user_input_lower = user_input.lower()
     
@@ -57,7 +56,7 @@ def validate_user_input_smart(user_input):
 
 def validate_prompt(prompt):
     """
-    原有的prompt验证函数
+    prompt验证函数
     """
     if not is_input_safe(prompt):
         return False
