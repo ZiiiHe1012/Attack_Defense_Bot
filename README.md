@@ -44,8 +44,8 @@ graph TD
 ```
 
 #### 各步骤详情：
-1. **智能黑名单检测**
-   - 调用：`validate_user_input_smart(q)`（来自guard.py）
+1. **黑名单检测**
+   - 调用：`validate_user_input(q)`（来自guard.py）
    - 功能：过滤已知不安全输入
 
 2. **意图识别**
@@ -81,7 +81,7 @@ graph TD
 | prompt_builder.py | 动态构建提示词 | build_prompt_v2() |
 | conversation.py | 调用LLM生成回答 | answerLM() |
 | api_client.py | 外部API调用 | dialogue()、search_similar_files() |
-| guard.py | 输入安全校验 | validate_user_input_smart() |
+| guard.py | 输入安全校验 | validate_user_input() |
 | safety_agent.py | 输入/输出安全检测 | is_input_safe()、is_output_safe() |
 
 ## 四、用户交互流程

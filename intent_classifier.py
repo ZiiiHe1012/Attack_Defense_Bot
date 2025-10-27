@@ -1,7 +1,4 @@
-"""
-意图识别模块
-区分用户的真实意图：学习知识 vs 实施攻击
-"""
+# 意图识别模块，区分用户的真实意图：学习知识 vs 实施攻击
 
 import json
 from api_client import dialogue
@@ -76,10 +73,8 @@ INTENT_CLASSIFICATION_PROMPT = """
 def classify_intent(user_input: str) -> dict:
     """
     使用LLM对用户输入进行意图分类
-    
     Args:
         user_input: 用户输入文本
-    
     Returns:
         {
             "intent": str,  # KNOWLEDGE/ATTACK/DEFENSE/GREY
@@ -92,7 +87,7 @@ def classify_intent(user_input: str) -> dict:
         response = dialogue(
             user_input=user_input,
             custom_prompt=INTENT_CLASSIFICATION_PROMPT,
-            temperature=0.1  # 低温度保证稳定输出
+            temperature=0.1
         )
         
         result_text = response.get("response", "").strip()
@@ -125,7 +120,6 @@ def classify_intent(user_input: str) -> dict:
 def validate_by_intent(user_input: str) -> tuple:
     """
     基于意图识别的验证
-    
     Returns:
         (bool/str, str/dict): 
             - (True, "原因") - 直接放行
@@ -153,8 +147,7 @@ def validate_by_intent(user_input: str) -> tuple:
     return "CONTINUE",intent_result
 
 
-# ========== 辅助函数 ==========
-
+# 辅助函数
 def get_intent_label(intent_result: dict) -> str:
     """获取易读的意图标签"""
     intent_map = {

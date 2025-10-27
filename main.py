@@ -2,20 +2,18 @@ from flask import Flask, render_template, request, jsonify
 from prompt_builder import build_prompt_v2, RAG_ANSWER_PROMPT_V2
 from data_processor import search_common_database
 from conversation import answerLM
-from guard import validate_user_input_smart
+from guard import validate_user_input
 from intent_classifier import validate_by_intent, get_intent_label, classify_intent
 from safety_agent import is_input_safe, is_output_safe
 
 app = Flask(__name__)
 
-# ========== 核心处理函数 ==========
+# 核心处理函数
 def process_query(q: str) -> dict:
     """
-    核心处理函数 - 六层安全检测流程
-    
+    六层安全检测流程
     Args:
         q: 用户问题
-    
     Returns:
         {
             "success": bool,
@@ -31,19 +29,19 @@ def process_query(q: str) -> dict:
         "logs": []
     }
     
-    # ========== 第1层：智能黑名单 ==========
-    result["logs"].append({"step": "智能黑名单", "status": "processing", "message": "检测中..."})
+    # 第1层：黑名单
+    result["logs"].append({"step": "黑名单", "status": "processing", "message": "检测中..."})
     
-    pass_blacklist, blacklist_msg = validate_user_input_smart(q)
+    pass_blacklist, blacklist_msg = validate_user_input(q)
     
     if not pass_blacklist:
-        result["logs"].append({"step": "智能黑名单", "status": "fail", "message": blacklist_msg})
+        result["logs"].append({"step": "黑名单", "status": "fail", "message": blacklist_msg})
         result["error"] = f"检测到不安全输入: {blacklist_msg}"
         return result
     
-    result["logs"].append({"step": "智能黑名单", "status": "success", "message": blacklist_msg})
+    result["logs"].append({"step": "黑名单", "status": "success", "message": blacklist_msg})
     
-    # ========== 第2层：意图识别 ==========
+    # 第2层：意图识别
     result["logs"].append({"step": "意图识别", "status": "processing", "message": "识别中..."})
     
     # 先获取完整的意图信息（用于后续输出检测）
@@ -68,7 +66,7 @@ def process_query(q: str) -> dict:
         result["logs"].append({"step": "意图识别", "status": "warning", "message": get_intent_label(intent_result)})
         need_ai_check = True
     
-    # ========== 第3层：AI安全检测（灰色地带）==========
+    # 第3层：AI安全检测（灰色地带）
     if need_ai_check:
         result["logs"].append({"step": "AI安全检测", "status": "processing", "message": "检测中..."})
         
@@ -79,7 +77,7 @@ def process_query(q: str) -> dict:
         
         result["logs"].append({"step": "AI安全检测", "status": "success", "message": "通过检测"})
     
-    # ========== 第4层：RAG检索 ==========
+    # 第4层：RAG检索
     result["logs"].append({"step": "RAG检索", "status": "processing", "message": "检索中..."})
     
     try:
@@ -92,7 +90,7 @@ def process_query(q: str) -> dict:
     # 构建prompt
     user_prompt = build_prompt_v2(documents, q, intent_result)
     
-    # ========== 第5层：生成回答 ==========
+    # 第5层：生成回答
     result["logs"].append({"step": "生成回答", "status": "processing", "message": "生成中..."})
     
     try:
@@ -103,7 +101,7 @@ def process_query(q: str) -> dict:
         result["error"] = f"生成失败: {e}"
         return result
     
-    # ========== 第6层：输出安全检测 ==========
+    # 第6层：输出安全检测
     result["logs"].append({"step": "输出检测", "status": "processing", "message": "检测中..."})
     
     if not is_output_safe(answer, intent_result=intent_result):
@@ -113,40 +111,35 @@ def process_query(q: str) -> dict:
     
     result["logs"].append({"step": "输出检测", "status": "success", "message": "输出安全"})
     
-    # ========== 成功返回 ==========
+    # 成功返回
     result["success"] = True
     result["answer"] = answer
     
     return result
 
 
-# ========== Flask 路由 ==========
-
+# Flask路由
 @app.route('/')
 def index():
-    """渲染主页"""
+    # 渲染主页
     return render_template('index.html')
-
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """处理聊天请求"""
+    # 处理聊天请求
     try:
         data = request.json
         message = data.get('message', '').strip()
-        
         if not message:
             return jsonify({
                 'success': False,
                 'error': '消息不能为空',
                 'logs': []
             })
-        
         # 调用核心处理函数
         result = process_query(message)
-        
         return jsonify(result)
-        
+    
     except Exception as e:
         return jsonify({
             'success': False,
@@ -154,26 +147,13 @@ def chat():
             'logs': []
         })
 
-
-@app.route('/health', methods=['GET'])
-def health():
-    """健康检查接口"""
-    return jsonify({
-        'status': 'ok',
-        'service': '安全知识助手',
-        'version': '2.0'
-    })
-
-
-# ========== 错误处理 ==========
-
+# 错误处理
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
         'success': False,
         'error': '请求的资源不存在'
     }), 404
-
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -182,16 +162,9 @@ def internal_error(error):
         'error': '服务器内部错误'
     }), 500
 
-
-# ========== 启动应用 ==========
-
+# 启动应用
 if __name__ == '__main__':
-    print("""
-     安全知识助手 - Web服务启动中...             
-
-服务地址: http://127.0.0.1:5000
-健康检查: http://127.0.0.1:5000/health
-""")
+    print("""安全知识助手 - Web服务启动中...""")
     
     app.run(
         host='127.0.0.1',

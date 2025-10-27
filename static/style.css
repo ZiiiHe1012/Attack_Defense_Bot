@@ -402,13 +402,13 @@ button {
     margin-bottom: 2px;  
     margin-top: 2px;
     padding-left: 12px;
-    line-height: 1;  /* 添加列表整体行高 */
+    line-height: 1;
 }
 
 .markdown-body li {
     margin-bottom: 2px;  
     margin-top: 2px;
-    line-height: 1;  /* 列表项行高 */
+    line-height: 1;
 }
 
 
@@ -555,21 +555,18 @@ button {
     background: #a8a8a8;
 }
 
-/*去掉列表整体上下多余留白 */
 .markdown-body ul,
 .markdown-body ol {
     margin-top: 0;
     margin-bottom: 0;
-    padding-inline-start: 18px;   /* 控制 · 或 1. 的缩进，可再小 */
+    padding-inline-start: 18px;
 }
 
-/* 每条列表项之间只留 1px 缝 */
 .markdown-body li {
     margin-bottom: 1px;
-    line-height: 1.5;             /* 从 1.9→1.5，行高直接压紧 */
+    line-height: 1.5;
 }
 
-/*紧跟在标题后面的列表，再削 2px 上间距（可选） */
 .markdown-body h2 + ul,
 .markdown-body h2 + ol,
 .markdown-body h3 + ul,
