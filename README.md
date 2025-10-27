@@ -222,10 +222,6 @@ token = "your-api-token"
    - KNOWLEDGE/DEFENSE意图放宽检测
    - ATTACK意图严格多轮验证
 
-4. **透明拒绝**
-   - 明确告知拒绝原因
-   - 提供合理的替代建议
-   - 引导用户正确使用系统
 
 ## 项目结构
 
