@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI安全知识问答系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <div class="header">
+        <div class="header-content">
+            <span class="header-icon">🛡️</span>
+            <div>
+                <div class="header-title">AI安全知识问答系统</div>
+                <div class="header-subtitle">基于RAG技术的智能安全助手,为您提供专业的网络安全知识解答。</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <div class="chat-container">
+            <!-- 对话区域 -->
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-message">
+                    <div class="welcome-icon">💬</div>
+                    <div class="welcome-title">对话窗口</div>
+                    <div class="welcome-text">
+                        您可以在下方输入框中提出安全相关的问题<br>
+                        例如: 什么是SQL注入? 如何防御XSS攻击?
+                    </div>
+                </div>
+            </div>
+
+            <!-- 加载状态 -->
+            <div class="loading-container" id="loadingIndicator">
+                <div class="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <span style="margin-left: 10px;">正在思考中...</span>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <div class="input-box">
+                        <textarea 
+                            id="userInput" 
+                            rows="3" 
+                            placeholder="请输入您的问题..."
+                        ></textarea>
+                    </div>
+                    <div class="button-group">
+                        <button class="send-btn" id="sendBtn">
+                            发送
+                        </button>
+                        <button class="clear-btn" id="clearBtn">
+                            清空对话
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
