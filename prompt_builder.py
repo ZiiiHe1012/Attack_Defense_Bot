@@ -173,7 +173,6 @@ def build_prompt(documents , query, intent_info=None, decomposed_supplement=None
             guide = f"\n\n【警告】检测到可疑意图（置信度{confidence:.0%}），仅提供高层原理，不给出实际攻击代码。"
         elif intent == "GREY":
             guide = f"\n\n【注意】意图不明确（置信度{confidence:.0%}），谨慎回答，避免提供可直接利用的危险内容。"
-
     if decomposed_supplement is not None:
         L1_text = '\n\n'.join(documents)
         d_text = '\n\n'.join([f'({x[0]},{x[1]})' for x in decomposed_supplement])
