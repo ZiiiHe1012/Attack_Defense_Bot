@@ -115,6 +115,7 @@ function clearChat() {
             </div>
         </div>
     `;
+    fetch('/clear_history', { method: 'POST' });
 }
 
 // 处理回车键

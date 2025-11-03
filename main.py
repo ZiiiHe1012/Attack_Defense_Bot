@@ -5,9 +5,10 @@ from conversation import answerLM
 from guard import validate_user_input, validate_prompt
 from intent_classifier import validate_by_intent, get_intent_label, classify_intent
 from safety_agent import is_input_safe, is_output_safe
-
+from context_intent import context_intent_validation, ConversationManager
 
 app = Flask(__name__)
+conversation_manager = ConversationManager(max_turns=5)
 
 def process_query(q: str) -> dict:
     """
@@ -28,6 +29,7 @@ def process_query(q: str) -> dict:
         "error": "",
         "logs": []
     }
+
     # 第1层：黑名单
     result["logs"].append({"step": "黑名单", "status": "processing", "message": "检测中..."})
     pass_blacklist, blacklist_msg = validate_user_input(q)
@@ -41,7 +43,15 @@ def process_query(q: str) -> dict:
     result["logs"].append({"step": "意图识别", "status": "processing", "message": "识别中..."})
     # 先获取完整的意图信息（用于后续输出检测）
     intent_result = classify_intent(q)
-    # 再进行意图验证（决定是否放行/拦截/进入AI检测）
+    # 进行上下文意图验证
+    result["logs"].append({"step": "上下文检测", "status": "processing", "message": "检查中..."})
+    is_safe, reason, _ = context_intent_validation(q, conversation_manager.get_history())
+    if is_safe is False:
+        result["logs"].append({"step": "上下文检测", "status": "fail", "message": reason})
+        result["error"] = reason
+        return result
+    result["logs"].append({"step": "上下文检测", "status": "success", "message": reason})
+    # 再进行本次意图验证（决定是否放行/拦截/进入AI检测）
     intent_validation = validate_by_intent(q)
     # 直接放行
     if intent_validation[0] is True:
@@ -101,12 +111,21 @@ def process_query(q: str) -> dict:
     # 成功返回
     result["success"] = True
     result["answer"] = answer
+    # 记录对话
+    conversation_manager.add_turn(q, answer)
+
     return result
 
 @app.route('/')
 def index():
     # 渲染主页
     return render_template('index.html')
+
+@app.route('/clear_history', methods=['POST'])
+def clear_history():
+    # 清除对话历史
+    conversation_manager.clear()
+    return jsonify({"success": True})
 
 @app.route('/chat', methods=['POST'])
 def chat():
