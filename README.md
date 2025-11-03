@@ -111,6 +111,34 @@ graph TD
 - 回答更结构化和系统化
 - 适合需要多角度解答的问题
 
+#### 递归检索策略（Recursive RAG）
+除了问题分解，系统还支持递归检索增强策略，通过迭代优化检索查询:
+```python
+示例流程:
+初始问题 → 检索文档 → LLM分析质量 → 优化查询 → 再次检索 → ...
+→ 达到停止条件(或最大迭代次数) → 返回最优结果
+```
+
+**特点**:
+- 自适应查询优化：根据检索结果质量动态调整查询
+- 迭代深化：逐步提升检索相关性和覆盖度
+- 智能终止：检测到文档足够详细时自动停止
+
+**实现机制** (`data_processor.py`):
+- 最大迭代次数：8轮
+- 终止条件：LLM判断文档已足够详细
+- 每轮保留查询和文档对，供后续综合使用
+
+**使用方式**:
+
+目前仅支持静态配置，后续集成到前端界面供用户选择：
+
+```python
+# 在main.py的process_query函数中配置
+supplement = advanced_search(q, 'recursive')  # 递归检索
+# supplement = advanced_search(q, 'decomposition')  # 问题分解
+```
+
 #### Prompt构建策略
 ```python
 def build_prompt(documents, query, intent_info, decomposed_supplement):

@@ -79,14 +79,15 @@ def process_query(q: str) -> dict:
     # 第4层：RAG检索
     result["logs"].append({"step": "RAG检索", "status": "processing", "message": "检索中..."})
     try:
-        # Advanced Rag pipeline, integrated into one entry function(this version i put single round query decomposition)
-        supplement = advanced_search(q, 'recursive')
+        # Advanced Rag pipeline, integrated into one entry function
+        # decomposed - 问题分解 recursive - 叠代检索
+        supplement = advanced_search(q, 'decomposed')
         # 从知识库检索相关文档
         L1_documents = search_database_bilingual(q, 5)
         result["logs"].append({"step": "RAG检索", "status": "success", "message": f"检索到相关文档"})
     except Exception as e:
         result["logs"].append({"step": "RAG检索", "status": "warning", "message": f"检索失败: {e}"})
-        #Advanced Rag pipeline, integrated into one entry function(this version i put single round query decomposition)
+        #Advanced Rag pipeline, integrated into one entry function
         # 构建增强提示词
     user_prompt = build_prompt(L1_documents, q, intent_result, supplement)
     
