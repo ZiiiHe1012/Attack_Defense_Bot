@@ -132,7 +132,7 @@ def build_prompt(documents, query, intent_info, decomposed_supplement):
 
 | 数据库名称 | 数据规模 | 数据来源 | 主要内容 |
 |:---------:|:-------:|:--------:|:-------:|
-| **ATT&CK** | 1,210条技术数据 | MITRE ATT&CK|  303条ICS/Mobile攻击技术<br> 907条Enterprise攻击技术<br> 包含技术描述、战术、平台信息 |
+| **ATT_CK** | 1,210条技术数据 | MITRE ATT&CK|  303条ICS/Mobile攻击技术<br> 907条Enterprise攻击技术<br> 包含技术描述、战术、平台信息 |
 | **D3FEND** | 3,224条防御数据 | MITRE D3FEND|  防御技术定义<br> 防御类别分类<br> 对抗关系映射 |
 | **OWASP** | 2,427段内容 | OWASP CheatSheet Series (100+个MD文件) |  Web安全最佳实践<br> 输入验证规范<br> 认证授权机制<br> 会话管理<br> 加密实现 |
 | **CYBER_METRIC** | 10801个问答对 | CyberMetric: A Benchmark Dataset based on Retrieval-Augmented Generation for Evaluating LLMs in Cybersecurity Knowledge <br> (IEEE CSR 2024) |  网络安全问答对<br> 基于检索增强生成的评估大语言模型在网络安全知识方面能力的基准数据集|
