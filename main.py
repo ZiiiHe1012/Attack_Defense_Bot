@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from prompt_builder import build_prompt, RAG_ANSWER_PROMPT, RAG_ADVANCED_ANSWER_PROMPT, build_prompt, RAG_ANSWER_PROMPT_V2
-from data_processor import search_common_database, advanced_search
+from data_processor import search_common_database, advanced_search,search_database_bilingual
 from conversation import answerLM
 from guard import validate_user_input, validate_prompt
 from intent_classifier import validate_by_intent, get_intent_label, classify_intent
@@ -80,9 +80,9 @@ def process_query(q: str) -> dict:
     result["logs"].append({"step": "RAG检索", "status": "processing", "message": "检索中..."})
     try:
         # Advanced Rag pipeline, integrated into one entry function(this version i put single round query decomposition)
-        supplement = advanced_search(q, 'decomposition')
+        supplement = advanced_search(q, 'recursive')
         # 从知识库检索相关文档
-        L1_documents = search_common_database(q, 5)
+        L1_documents = search_database_bilingual(q, 5)
         result["logs"].append({"step": "RAG检索", "status": "success", "message": f"检索到相关文档"})
     except Exception as e:
         result["logs"].append({"step": "RAG检索", "status": "warning", "message": f"检索失败: {e}"})
