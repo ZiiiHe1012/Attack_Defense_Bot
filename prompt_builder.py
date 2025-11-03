@@ -72,7 +72,35 @@ Input:什么是SQL注入？
 Expected output:{SQL注入的概念是什么}{SQL注入有哪些手段}{SQL注入带来什么安全隐患}{怎么防止SQL注入}
 
 """
+QUERY_REFINEMENT_PROMPT="""Your task is to make refinement to a generalized or broad question into a more detailed and solvable one, ensuring they are
+clear and unambiguous. This requires pinpointing elements of the question that could
+be interpreted in more than one way and refining the question to ensure a detailed and insightful one.
 
+You will be given the initial question and the relevant documents searched by the query
+You will be also given the previous refinement proposed by yourself and the documents searched by the query.
+Approach this task as follows:
+Analyze the Question: Read the question thoroughly to identify ambiguous parts. Consider
+the different ways the question could be interpreted based on its current wording.
+Analyze the documents:Read documents thoroughly to identify whether the documents are enough to answer initial question
+Clarify the Query: Reformulate the question to eliminate ambiguity. This may involve
+specifying details, narrowing down broad terms, or providing additional context to guide
+the interpretation.
+
+if the question is clear and document is detailed enough,directly output "<stop>"
+if the question is clear and document is detailed enough,directly output "<stop>"
+if the question is clear and document is detailed enough,directly output "<stop>"
+
+Here’s an example of how to complete the task:
+For example:
+Input:initial question:什么是SQL注入？documents:<many documents>
+Expected output:SQL注入的概念是什么,SQL注入有哪些手段,SQL注入带来什么安全隐患,怎么防止SQL注入?
+
+Input:initial question：什么是SQL注入？?documents:<many documents>
+refinement:SQL注入的概念是什么,SQL注入有哪些手段,SQL注入带来什么安全隐患,怎么防止SQL注入? documents:<many documents>
+Expected output:<stop>
+—
+
+"""
 RAG_ANSWER_PROMPT_V2 = """
 你是一个专业的**网络安全知识助手**，致力于传播正确的安全知识、提升用户的安全意识和防护能力。
 
@@ -160,6 +188,8 @@ cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
 现在，请根据检索到的文档和你的知识，回答用户的问题。
 """
 
+TRANSLATE_PROMPT="""Translate the following Chinese into English.Directly output the plain text of translation"""
+
 def build_prompt(documents , query, intent_info=None, decomposed_supplement=None):
     guide = ""
     if intent_info:
@@ -183,4 +213,13 @@ def build_prompt(documents , query, intent_info=None, decomposed_supplement=None
     else:
         text = '\n\n'.join(documents)
         prompt = f"Retrieved documents:{text}user's question:{query}{guide}"
+    return prompt
+def build_recursive_prompt(step):
+    prompt=''
+    for idx,item in enumerate(step):
+        if idx==0:
+            prompt+=f"initial question:{item[0]}  documents:{item[1]}"
+        else:
+            prompt+=f'\n\n refinement:{item[0]}  documents:{item[1]}'
+    print(f'1**1{prompt}')
     return prompt
