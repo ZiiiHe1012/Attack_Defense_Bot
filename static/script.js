@@ -15,12 +15,14 @@ function addMessage(content, type = 'bot') {
     const iconText = type === 'user' ? '👤' : '🤖';
     const headerText = type === 'user' ? '您' : 'AI助手';
 
+    const formattedContent = type === 'bot' ? formatMarkdown(content) : content;
+
     messageDiv.innerHTML = `
         <div class="message-header">
             <span class="message-icon ${iconClass}">${iconText}</span>
             <span>${headerText}</span>
         </div>
-        <div class="message-content">${content}</div>
+        <div class="message-content">${formattedContent}</div>
     `;
 
     chatMessages.appendChild(messageDiv);
@@ -147,3 +149,16 @@ document.addEventListener('DOMContentLoaded', function() {
     userInput.addEventListener('keydown', handleKeyPress);
     userInput.addEventListener('input', autoResizeTextarea);
 });
+
+// 格式化Markdown内容为HTML 
+function formatMarkdown(markdownText) {
+    let htmlText = markdownText
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>') // 代码块
+        .replace(/`([^`]+)`/g, '<code>$1</code>') // 行内代码
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // 粗体
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>') // 斜体
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">') // 图片
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>') // 链接
+        .replace(/\n/g, '<br>'); // 换行
+    return htmlText;
+}
