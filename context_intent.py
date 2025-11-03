@@ -60,8 +60,8 @@ def analyze_context_intent(
     )
     try:
         response = dialogue(
-            user_input=current_query,
-            custom_prompt=prompt,
+            user_input=prompt,
+            custom_prompt=None,
             temperature=0.1
         )
         result_text = response.get("response", "").strip()
@@ -85,17 +85,7 @@ def context_intent_validation(
     user_input: str,
     conversation_history: Optional[List[Dict]] = None
 ) -> Tuple[bool, str, Dict]:
-    """
-    上下文意图验证
-    Args:
-        user_input: 当前用户输入
-        conversation_history: 对话历史（可选）
-    Returns:
-        (is_safe: bool/str, reason: str, analysis_details: dict)
-        - is_safe: True=安全放行, False=拦截, "CONTINUE"=需继续检测
-        - reason: 决策原因
-        - analysis_details: 完整分析结果
-    """
+    # 上下文意图验证
     analysis_details = {
         "context_analysis": None
     }
@@ -103,15 +93,20 @@ def context_intent_validation(
     if not conversation_history or len(conversation_history) == 0:
         return "CONTINUE", "无历史记录，继续后续检测", analysis_details
     # 上下文意图分析
-    context_result = analyze_context_intent(user_input, conversation_history)
-    analysis_details["context_analysis"] = context_result
-    # 检测到渐进式攻击
-    if context_result.get("is_progressive_attack") and context_result.get("confidence", 0) > 0.75:
-        reason = f"检测到渐进式攻击意图: {context_result.get('reasoning', '未知')}"
-        warning_signals = context_result.get("warning_signals", [])
-        if warning_signals:
-            reason += f"\n警告信号: {', '.join(warning_signals)}"
-        return False, reason, analysis_details
+    try:
+        context_result = analyze_context_intent(user_input, conversation_history)
+        analysis_details["context_analysis"] = context_result
+        # 检测到渐进式攻击
+        if context_result.get("is_progressive_attack") and context_result.get("confidence", 0) > 0.75:
+            reason = f"检测到渐进式攻击意图: {context_result.get('reasoning', '未知')}"
+            warning_signals = context_result.get("warning_signals", [])
+            if warning_signals:
+                reason += f"\n警告信号: {', '.join(warning_signals)}"
+            return False, reason, analysis_details
+    except Exception as e:
+        print(f"上下文意图分析异常: {e}")
+        # 异常时继续后续检测
+        analysis_details["context_analysis"] = {"error": str(e)}
     # 未检测到明显攻击，继续后续检测
     return "CONTINUE", "上下文分析未发现渐进式攻击", analysis_details
 

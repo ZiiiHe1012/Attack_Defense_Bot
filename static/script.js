@@ -155,6 +155,10 @@ function formatMarkdown(markdownText) {
     let htmlText = markdownText
         .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>') // 代码块
         .replace(/`([^`]+)`/g, '<code>$1</code>') // 行内代码
+        .replace(/#### ([^\n]+)/g, '<h4>$1</h4>') // 四级标题
+        .replace(/### ([^\n]+)/g, '<h3>$1</h3>') // 三级标题 
+        .replace(/## ([^\n]+)/g, '<h2>$1</h2>')  // 二级标题 
+        .replace(/# ([^\n]+)/g, '<h1>$1</h1>')   // 一级标题 
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // 粗体
         .replace(/\*([^*]+)\*/g, '<em>$1</em>') // 斜体
         .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">') // 图片

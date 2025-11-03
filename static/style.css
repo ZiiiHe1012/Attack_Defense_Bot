@@ -364,6 +364,29 @@ button {
     margin: 10px 0;
 }
 
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+    margin: 8px 0 6px 0;
+    font-weight: 600;
+}
+
+.message-content h1 {
+    font-size: 1.8em;
+    border-bottom: 2px solid #e5e5e5;
+    padding-bottom: 6px;
+}
+
+.message-content h2 {
+    font-size: 1.5em;
+    color: #1a1a1a;
+}
+
+.message-content h3 {
+    font-size: 1.25em;
+    color: #333;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .header {
