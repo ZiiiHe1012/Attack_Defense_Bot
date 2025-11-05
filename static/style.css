@@ -552,7 +552,7 @@ body {
     line-height: 1.75;
     border-radius: 18px;     
     padding: 14px 20px;       
-    max-width: 80%;           
+    max-width:67%;          
     word-wrap: break-word;
     white-space: pre-wrap;
     border: 1px solid #e0e0e0;
@@ -604,4 +604,28 @@ body {
 }
 .chat-rename-input:focus {
     outline-color: #666;
+}
+
+/* 调整 Markdown 渲染的标题与正文间距 */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+    margin-top: 12px;   /* 减小上间距 */
+    margin-bottom: 8px; /* 减小下间距 */
+}
+
+/* 段落间距 */
+.markdown-body p {
+    margin-top: 4px;
+    margin-bottom: 6px;
+}
+
+/* 列表更紧凑 */
+.markdown-body ul,
+.markdown-body ol {
+    margin-top: 4px;
+    margin-bottom: 6px;
 }
