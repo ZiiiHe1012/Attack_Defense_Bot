@@ -11,25 +11,15 @@ from context_intent import context_intent_validation, ConversationManager
 app = Flask(__name__)
 conversation_manager = ConversationManager(max_turns=5)
 
-def process_query(q: str) -> dict:
+def _single_detection(q: str, intent_result: dict = None) -> dict:
     """
-    五层安全检测流程
-    
-    1. 移除误拦截严重的黑名单机制
-    2. 依靠多层智能检测保证安全性
-    3. 每层都有上下文理解能力
-    4. 拦截时提供教育性回复
+    单次检测的内部实现
     
     Args:
         q: 用户问题
+        intent_result: 意图识别结果（如果已有）
     Returns:
-        {
-            "success": bool,
-            "answer": str,
-            "error": str,
-            "logs": [{"step": str, "status": str, "message": str}],
-            "blocked": bool
-        }
+        检测结果字典
     """
     result = {
         "success": False,
@@ -40,13 +30,15 @@ def process_query(q: str) -> dict:
     }
     
     # === 第1层: 意图识别 ===
-    result["logs"].append({
-        "step": "意图识别", 
-        "status": "processing", 
-        "message": "分析用户意图中..."
-    })
+    if intent_result is None:
+        result["logs"].append({
+            "step": "意图识别", 
+            "status": "processing", 
+            "message": "分析用户意图中..."
+        })
+        
+        intent_result = classify_intent_v2(q)
     
-    intent_result = classify_intent_v2(q)
     intent = intent_result.get("intent", "GREY")
     confidence = intent_result.get("confidence", 0.5)
     
@@ -254,10 +246,75 @@ def process_query(q: str) -> dict:
     result["success"] = True
     result["answer"] = answer
     
-    # 记录对话历史
-    conversation_manager.add_turn(q, answer)
-    
     return result
+
+
+def process_query(q: str) -> dict:
+    """
+    两轮安全检测流程
+    策略：两轮检测，只要有一次拦截就算拦截（更严格）
+    - 第1轮：无对话历史的检测
+    - 第2轮：有对话历史的检测（防止多轮诱导）
+    
+    Args:
+        q: 用户问题
+    Returns:
+        {
+            "success": bool,
+            "answer": str,
+            "error": str,
+            "logs": [{"step": str, "status": str, "message": str}],
+            "blocked": bool,
+            "round1_blocked": bool,  # 第1轮是否拦截
+            "round2_blocked": bool,  # 第2轮是否拦截
+            "rounds_consistent": bool  # 两轮结果是否一致
+        }
+    """
+    # 第1轮：无历史
+    result_round1 = _single_detection(q)
+    block_round1 = result_round1.get("blocked", False)
+    
+    # 如果第1轮就拦截了，直接返回（带上轮次信息）
+    if block_round1:
+        result_round1["round1_blocked"] = True
+        result_round1["round2_blocked"] = False  # 第2轮未执行
+        result_round1["rounds_consistent"] = True  # 第1轮拦截，视为一致
+        # 在日志开头添加说明
+        result_round1["logs"].insert(0, {
+            "step": "双轮检测", 
+            "status": "info", 
+            "message": "第1轮检测拦截，直接返回"
+        })
+        return result_round1
+    
+    # 第2轮：带历史（第1轮未拦截，需要加入对话历史后再检测）
+    # 临时添加到历史中
+    temp_answer = result_round1.get("answer", "")
+    conversation_manager.add_turn(q, temp_answer)
+    
+    result_round2 = _single_detection(q)
+    block_round2 = result_round2.get("blocked", False)
+    
+    
+    # 最终判定：只要有一次拦截就算拦截
+    final_blocked = block_round1 or block_round2
+    
+    # 选择返回哪一轮的结果
+    if final_blocked:
+        # 如果被拦截，返回拦截那一轮的教育性回复
+        final_result = result_round2 if block_round2 else result_round1
+    else:
+        # 都没拦截，返回第2轮的正常答案
+        final_result = result_round2
+        # 正式添加到对话历史（如果没拦截）
+    
+    # 添加轮次信息
+    final_result["blocked"] = final_blocked
+    final_result["round1_blocked"] = block_round1
+    final_result["round2_blocked"] = block_round2
+    final_result["rounds_consistent"] = (block_round1 == block_round2)
+    
+    return final_result
 
 
 @app.route('/')
