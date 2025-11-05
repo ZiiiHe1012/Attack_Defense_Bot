@@ -95,7 +95,7 @@ INTENT_CLASSIFICATION_PROMPT_V2 = """
 
 def classify_intent_v2(user_input: str) -> dict:
     """
-    改进的意图分类函数
+    意图分类函数
     """
     try:
         response = dialogue(
@@ -130,7 +130,7 @@ def classify_intent_v2(user_input: str) -> dict:
 
 def validate_by_intent_v2(user_input: str) -> tuple:
     """
-    改进的意图验证函数
+    意图验证函数
     Returns:
         (bool/str, str/dict): 
             - (True, "原因") - 直接放行
