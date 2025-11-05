@@ -9,7 +9,7 @@ INTENT_CLASSIFICATION_PROMPT_V2 = """
 **核心判断标准**:
 
 1. **知识学习**(KNOWLEDGE): 询问概念、原理、技术介绍(不涉及具体实施)
-   特征:S
+   特征:
    - 关键词: "什么是"、"原理"、"介绍"、"定义"、"概念"
    - 询问攻击的危害、影响、历史
    - 不要求具体代码、payload或实施步骤
@@ -113,6 +113,15 @@ def classify_intent_v2(user_input: str) -> dict:
         
         result = json.loads(result_text)
         
+        # 确保 confidence 是浮点数
+        if "confidence" in result:
+            try:
+                result["confidence"] = float(result["confidence"])
+            except (ValueError, TypeError):
+                result["confidence"] = 0.5
+        else:
+            result["confidence"] = 0.5
+        
         # 确保包含risk_level字段
         if "risk_level" not in result:
             result["risk_level"] = "medium"
@@ -130,7 +139,7 @@ def classify_intent_v2(user_input: str) -> dict:
 
 def validate_by_intent_v2(user_input: str) -> tuple:
     """
-    意图验证函数
+    改进的意图验证函数
     Returns:
         (bool/str, str/dict): 
             - (True, "原因") - 直接放行
@@ -141,6 +150,12 @@ def validate_by_intent_v2(user_input: str) -> tuple:
     intent = intent_result.get("intent", "GREY")
     confidence = intent_result.get("confidence", 0.5)
     risk_level = intent_result.get("risk_level", "medium")
+    
+    # 确保 confidence 是浮点数（双重保护）
+    try:
+        confidence = float(confidence)
+    except (ValueError, TypeError):
+        confidence = 0.5
     
     # 知识学习: 高置信度直接放行
     if intent == "KNOWLEDGE" and confidence > 0.85:
