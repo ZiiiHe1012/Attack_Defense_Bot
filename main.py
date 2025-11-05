@@ -11,7 +11,7 @@ from context_intent import context_intent_validation, ConversationManager
 app = Flask(__name__)
 conversation_manager = ConversationManager(max_turns=5)
 
-def process_query_no_blacklist(q: str) -> dict:
+def process_query(q: str) -> dict:
     """
     五层安全检测流程
     
@@ -297,7 +297,7 @@ def chat():
             })
         
         # 调用核心处理函数
-        result = process_query_no_blacklist(message)
+        result = process_query(message)
         return jsonify(result)
         
     except Exception as e:
