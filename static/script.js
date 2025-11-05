@@ -342,7 +342,7 @@ async function sendMessage() {
             addErrorMessage(data.error || '发生未知错误');
         }
     } catch (error) {
-
+        // 主动中止不报错
         if (error.name === 'AbortError') {
             console.log('请求已取消');
             return;
