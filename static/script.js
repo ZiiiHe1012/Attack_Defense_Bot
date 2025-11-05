@@ -7,6 +7,46 @@ let isSidebarCollapsed = false;
 let isRequestPending = false;
 let currentAbortController = null;
 
+// ===== 本地存储 =====
+const STORAGE_KEY = 'fortgpt_state_v1';
+
+function saveState() {
+    try {
+        const data = {
+            conversations,
+            currentConversationId,
+            conversationCounter
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.error('保存对话失败', e);
+    }
+}
+
+function loadState() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || !Array.isArray(data.conversations)) return false;
+
+        conversations = data.conversations;
+        currentConversationId = data.currentConversationId ?? null;
+        conversationCounter = data.conversationCounter ?? 1;
+
+        if (conversations.length > 0) {
+            const exists = conversations.some(c => c.id === currentConversationId);
+            if (!exists) {
+                currentConversationId = conversations[0].id;
+            }
+        }
+        return true;
+    } catch (e) {
+        console.error('读取对话失败', e);
+        return false;
+    }
+}
+
 // 工具函数
 function getCurrentConversation() {
     return conversations.find(c => c.id === currentConversationId) || null;
@@ -25,7 +65,9 @@ function createNewConversation() {
     renderChatList();
     renderConversation(conv);
 
+    // 通知后端清理上下文
     fetch('/clear_history', { method: 'POST' }).catch(() => {});
+    saveState();
 }
 
 // 删除对话
@@ -47,6 +89,7 @@ function deleteConversation(id) {
         fetch('/clear_history', { method: 'POST' }).catch(() => {});
     }
     renderChatList();
+    saveState();
 }
 
 // 根据首条用户消息重命名
@@ -55,10 +98,10 @@ function setConversationTitleFromFirstUserMessage(conv) {
     if (firstUser) {
         conv.title = firstUser.content.slice(0, 20) || conv.title;
         renderChatList();
+        saveState();
     }
 }
 
-// 渲染侧边栏列表
 // 渲染侧边栏列表（支持重命名）
 function renderChatList() {
     const list = document.getElementById('chatList');
@@ -99,6 +142,7 @@ function renderChatList() {
             const save = () => {
                 conv.title = input.value.trim() || conv.title;
                 renderChatList();
+                saveState();
             };
 
             input.addEventListener('blur', save);
@@ -112,14 +156,13 @@ function renderChatList() {
     });
 }
 
-
 // 切换会话
 function switchConversation(id) {
     if (id === currentConversationId) return;
 
     // 若正在思考中，先中止旧请求
     if (isRequestPending) {
-        stopCurrentRequest();  
+        stopCurrentRequest();
     }
 
     const conv = conversations.find(c => c.id === id);
@@ -128,12 +171,14 @@ function switchConversation(id) {
     currentConversationId = id;
     renderChatList();
     renderConversation(conv);
+    saveState();
 }
 
 // 对话区域渲染
 function clearMessagesDom() {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
+
     chatMessages.innerHTML = `
         <div class="welcome-message">
             <div class="welcome-title">正在准备着</div>
@@ -146,15 +191,15 @@ function clearMessagesDom() {
 }
 
 function renderConversation(conv) {
-    clearMessagesDom();
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
 
-    if (conv.messages.length > 0) {
-        const welcomeMsg = chatMessages.querySelector('.welcome-message');
-        if (welcomeMsg) welcomeMsg.remove();
+    if (!conv || !conv.messages || conv.messages.length === 0) {
+        clearMessagesDom();
+        return;
     }
 
+    chatMessages.innerHTML = '';
     conv.messages.forEach(m => renderMessageDom(m.content, m.type));
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -169,12 +214,11 @@ function renderMessageDom(content, type = 'bot') {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}-message`;
 
-    const headerLabel = type === 'user' ? '你' : 'AI';
-    const formattedContent = type === 'bot' ? formatMarkdown(content) : content;
+    const formattedContent = type === 'bot' ? formatMarkdown(content) : escapeHtml(content);
 
     messageDiv.innerHTML = `
         <div class="message-header">
-            <div class="message-icon">${headerLabel}</div>
+            <div class="message-icon"></div>
         </div>
         <div class="message-content">${formattedContent}</div>
     `;
@@ -193,25 +237,25 @@ function appendMessageToCurrent(content, type) {
     if (type === 'user' && conv.messages.length === 1) {
         setConversationTitleFromFirstUserMessage(conv);
     }
+    saveState();
 }
 
 function addErrorMessage(content) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'message error-message';
-    messageDiv.innerHTML = `
-        <div class="message-header">
-            <div class="message-icon">!</div>
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'message bot-message';
+    errorDiv.innerHTML = `
+        <div class="message-content" style="color:#d0302f;background:#ffecec;border:1px solid #ffb3b3;">
+            ${escapeHtml(content)}
         </div>
-        <div class="message-content">${content}</div>
     `;
-    chatMessages.appendChild(messageDiv);
+    chatMessages.appendChild(errorDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// 加载状态 + 按钮形态
+// 发送按钮加载状态
 function setLoading(isLoading) {
     const sendBtn = document.getElementById('sendBtn');
     const chatMessages = document.getElementById('chatMessages');
@@ -220,40 +264,39 @@ function setLoading(isLoading) {
     isRequestPending = isLoading;
 
     if (isLoading) {
-        // --- 开始加载 ---
+        // 开始加载
         sendBtn.classList.add('loading');
         sendBtn.title = '停止生成';
 
-        const loadingDiv = document.createElement('div');
-        loadingDiv.id = 'loadingIndicator';
-        loadingDiv.className = 'message bot-message loading-message';
 
-        loadingDiv.innerHTML = `
-            <div class="message-header">
-                <div class="message-icon">AI</div>
-            </div>
-            <div class="loading-dots">
-                <span></span><span></span><span></span>
-            </div>
-        `;
+        let loadingDiv = document.getElementById('loadingIndicator');
+        if (!loadingDiv) {
+            loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loadingIndicator';
+            loadingDiv.className = 'message bot-message loading-message';
 
-        chatMessages.appendChild(loadingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+            loadingDiv.innerHTML = `
+                <div class="loading-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            `;
 
-
-
+            chatMessages.appendChild(loadingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     } else {
-        // --- 结束加载 ---
+        // 结束加载
         sendBtn.classList.remove('loading');
         sendBtn.title = '发送';
 
-        // 4. 从聊天窗口中移除加载元素
         const loadingIndicator = document.getElementById('loadingIndicator');
         if (loadingIndicator) {
             loadingIndicator.remove();
         }
     }
 }
+
+
 
 // 发送消息
 async function sendMessage() {
@@ -263,13 +306,13 @@ async function sendMessage() {
     const text = input.value.trim();
     if (!text || isRequestPending) return;
 
-    // 记录发送前的会话 id
+    // 发送前确保有当前会话，并记录当时的会话 id
     let conv = getCurrentConversation();
     if (!conv) {
         createNewConversation();
         conv = getCurrentConversation();
     }
-    const convIdAtSend = conv.id;
+    const convIdAtSend = conv ? conv.id : null;
 
     appendMessageToCurrent(text, 'user');
     input.value = '';
@@ -290,8 +333,8 @@ async function sendMessage() {
         setLoading(false);
 
         if (data.success) {
-            // 如果发送期间用户切换了对话，就不渲染这条回复
-            if (convIdAtSend !== currentConversationId) {
+            // 如果发送期间用户切换了会话，不渲染这条回复
+            if (convIdAtSend && convIdAtSend !== currentConversationId) {
                 return;
             }
             appendMessageToCurrent(data.answer, 'bot');
@@ -299,6 +342,7 @@ async function sendMessage() {
             addErrorMessage(data.error || '发生未知错误');
         }
     } catch (error) {
+
         if (error.name === 'AbortError') {
             console.log('请求已取消');
             return;
@@ -312,13 +356,17 @@ async function sendMessage() {
 // 停止当前请求
 function stopCurrentRequest() {
     if (currentAbortController) {
-        currentAbortController.abort();
-        currentAbortController = null;
+        try {
+            currentAbortController.abort();
+        } catch (e) {
+            console.error(e);
+        }
     }
+    currentAbortController = null;
     setLoading(false);
 }
 
-// 清空当前会话
+// 清空当前会话消息
 function clearChat() {
     const conv = getCurrentConversation();
     if (!conv) return;
@@ -326,11 +374,12 @@ function clearChat() {
     conv.messages = [];
     renderConversation(conv);
     fetch('/clear_history', { method: 'POST' }).catch(() => {});
+    saveState();
 }
 
-// 输入框相关 enter发送
+// 回车发送
 function handleKeyPress(event) {
-    if (event.key === 'Enter' ) {
+    if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         if (isRequestPending) {
             stopCurrentRequest();
@@ -340,27 +389,29 @@ function handleKeyPress(event) {
     }
 }
 
+// 输入框自适应高度
 function autoResizeTextarea() {
     const textarea = document.getElementById('userInput');
     if (!textarea) return;
     textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    const maxHeight = 200;
+    textarea.style.height = Math.min(textarea.scrollHeight, maxHeight) + 'px';
 }
 
-// 侧边栏开关
+// 侧边栏折叠状态
 function updateSidebarState() {
     const sidebar = document.getElementById('sidebar');
     const headerLogoBtn = document.getElementById('headerLogoBtn');
     if (!sidebar || !headerLogoBtn) return;
 
     if (isSidebarCollapsed) {
-        // 折叠：侧边栏收起，右上角按钮显示（带 .collapsed，用于 hover 切图标）
+        // 折叠：侧边栏收起，右上角按钮显示
         sidebar.classList.add('collapsed');
         headerLogoBtn.classList.add('collapsed');
         headerLogoBtn.style.display = 'flex';
         headerLogoBtn.title = '打开边栏';
     } else {
-        // 展开：侧边栏展开，右上角按钮隐藏，只保留左上角侧边栏里的 openai logo
+        // 展开：侧边栏展开，右上角按钮隐藏
         sidebar.classList.remove('collapsed');
         headerLogoBtn.classList.remove('collapsed');
         headerLogoBtn.style.display = 'none';
@@ -378,21 +429,41 @@ function collapseSidebar() {
     updateSidebarState();
 }
 
-// Markdown 简单处理
+// 简单 Markdown 渲染
 function formatMarkdown(text) {
-    let html = text
-        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/#### ([^\n]+)/g, '<h4>$1</h4>')
-        .replace(/### ([^\n]+)/g, '<h3>$1</h3>')
-        .replace(/## ([^\n]+)/g, '<h2>$1</h2>')
-        .replace(/# ([^\n]+)/g, '<h1>$1</h1>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-        .replace(/\n/g, '<br>');
+    if (!text) return '';
+    let html = text;
+
+    // 代码块
+    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    // 行内代码
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // 标题
+    html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    // 粗体、斜体
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // 图片、链接
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">');
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // 换行
+    html = html.replace(/\n/g, '<br>');
+
     return html;
+}
+
+// 文本转义
+function escapeHtml(text) {
+    if (text == null) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // 初始化
@@ -430,6 +501,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sidebarLogo) {
         sidebarLogo.addEventListener('click', createNewConversation);
     }
-    // 默认创建一个对话
-    createNewConversation();
+
+    // 初始化对话：优先从本地恢复
+    const restored = loadState();
+    if (restored && conversations.length > 0) {
+        renderChatList();
+        const conv = conversations.find(c => c.id === currentConversationId) || conversations[0];
+        currentConversationId = conv.id;
+        renderConversation(conv);
+    } else {
+        // 首次访问或本地数据为空时，新建一个对话
+        createNewConversation();
+    }
+
+    updateSidebarState();
 });
