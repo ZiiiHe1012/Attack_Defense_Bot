@@ -1,5 +1,5 @@
 """
-安全检测系统批量集成测试
+安全检测系统批量测试脚本
 """
 
 import json
@@ -10,21 +10,17 @@ from datetime import datetime
 
 # 根据实际情况导入
 try:
-    from main import process_query as process_query, conversation_manager
+    from main import process_query, conversation_manager
 except ImportError:
-    try:
-        from main import process_query, conversation_manager
-    except ImportError:
-        print("错误: 无法导入 process_query 函数，请检查 main.py ")
-        sys.exit(1)
+    print("错误: 无法导入 main.py，请确保 main.py 在当前目录")
+    sys.exit(1)
 
 
 class SecurityBatchTester:
-    """安全检测系统批量集成测试 v2.0"""
+    """安全检测系统批量测试"""
 
     def __init__(self, test_data_path=None):
         if test_data_path is None:
-            # 默认：当前文件同级目录下的 test_data/test_cases.json
             test_data_path = Path(__file__).parent / "test_data" / "test_cases.json"
 
         self.test_data_path: Path = Path(test_data_path)
@@ -50,9 +46,9 @@ class SecurityBatchTester:
             print(f"✗ 加载测试用例失败: {e}")
             return []
 
-    def run_integration_tests(self, limit=None, verbose=False):
+    def run_tests(self, limit=None, verbose=False):
         """
-        运行集成测试（两轮判断）
+        运行测试
         
         Args:
             limit: 仅测试前N条用例
@@ -61,13 +57,10 @@ class SecurityBatchTester:
         total_cases = len(self.test_cases) if limit is None else min(limit, len(self.test_cases))
 
         print("\n" + "=" * 80)
-        print("安全检测系统测试 - 集成测试模式（v2.0 教育性回复版本）")
+        print("安全检测系统测试")
         print("=" * 80)
         print(f"测试用例数量: {total_cases}")
-        print("说明：")
-        print("  • 每个用例执行两轮判断，第二轮结果作为最终判定")
-        print("  • 新版本：被拦截时返回教育性回复 (success=True, blocked=True)")
-        print("  • 判断标准：检查 result['blocked'] 字段\n")
+
 
         self.results = []
         passed_count = 0
@@ -88,24 +81,25 @@ class SecurityBatchTester:
                 # 每个用例开始前，清空历史
                 conversation_manager.clear()
 
-                # 第一轮判断：无上下文
-                if verbose:
-                    print("  [第1轮] 调用 process_query（无历史）...")
-                result_round1 = process_query(query)
-
-                # 第二轮判断：在第一轮的对话基础上再次调用
-                if verbose:
-                    print("  [第2轮] 调用 process_query（带历史）...")
-                result_round2 = process_query(query)
-
-                # 最终以第二轮结果为准
-                final_result = result_round2
+                # 调用 process_query（内部会自动两轮检测）
+                result = process_query(query)
                 
-                # 关键改进：检查 blocked 字段
-                actual_block = final_result.get("blocked", False)
+                # 获取最终判定结果
+                actual_block = result.get("blocked", False)
                 
-
-                print(f"  实际     : {' 拦截' if actual_block else ' 放行'}")
+                # 获取两轮检测的详细信息
+                round1_blocked = result.get("round1_blocked", None)
+                round2_blocked = result.get("round2_blocked", None)
+                rounds_consistent = result.get("rounds_consistent", True)
+                
+                # 显示两轮检测情况
+                if round1_blocked is not None and round2_blocked is not None:
+                    print(f"  第1轮    : {' 拦截' if round1_blocked else ' 放行'}")
+                    print(f"  第2轮    : {' 拦截' if round2_blocked else ' 放行'}")
+                    if not rounds_consistent:
+                        print(f"    两轮结果不一致")
+                
+                print(f"  最终     : {' 拦截' if actual_block else ' 放行'}")
 
                 # 判断是否通过
                 passed = (actual_block == expected_block)
@@ -122,25 +116,17 @@ class SecurityBatchTester:
                         print(f"  类型     : 漏拦截 (False Negative)")
                         print(f"  说明     : 应该拦截但放行了")
                     
-                    # 显示拦截原因或答案片段
-                    if actual_block:
-                        # 被拦截，显示教育性回复的开头
-                        answer = final_result.get("answer", "")
-                        if answer:
-                            preview = answer[:100] + "..." if len(answer) > 100 else answer
-                            print(f"  回复预览 : {preview}")
-                    else:
-                        # 未被拦截，显示答案开头
-                        answer = final_result.get("answer", "")
-                        if answer:
-                            preview = answer[:100] + "..." if len(answer) > 100 else answer
-                            print(f"  答案预览 : {preview}")
+                    # 显示答案预览
+                    answer = result.get("answer", "")
+                    if answer:
+                        preview = answer[:100] + "..." if len(answer) > 100 else answer
+                        print(f"  回复预览 : {preview}")
                 
                 # 显示检测日志（可选）
-                if verbose and final_result.get("logs"):
+                if verbose and result.get("logs"):
                     print("  检测日志:")
-                    for log in final_result.get("logs", []):
-                        status_icon = "✓" if log["status"] == "success" else "✗" if log["status"] == "fail" else "⚠"
+                    for log in result.get("logs", []):
+                        status_icon = "✓" if log["status"] == "success" else "✗" if log["status"] == "fail" else "⚠" if log["status"] == "warning" else "ℹ"
                         print(f"    {status_icon} {log['step']}: {log['message']}")
 
                 # 保存结果
@@ -151,20 +137,13 @@ class SecurityBatchTester:
                     "expected_block": expected_block,
                     "actual_block": actual_block,
                     "passed": passed,
-                    "round1": {
-                        "success": result_round1.get("success", False),
-                        "blocked": result_round1.get("blocked", False),
-                        "error": result_round1.get("error", ""),
-                        "answer_preview": (result_round1.get("answer", "") or "")[:200],
-                        "logs": result_round1.get("logs", []),
-                    },
-                    "round2": {
-                        "success": result_round2.get("success", False),
-                        "blocked": result_round2.get("blocked", False),
-                        "error": result_round2.get("error", ""),
-                        "answer_preview": (result_round2.get("answer", "") or "")[:200],
-                        "logs": result_round2.get("logs", []),
-                    },
+                    "round1_blocked": round1_blocked,
+                    "round2_blocked": round2_blocked,
+                    "rounds_consistent": rounds_consistent,
+                    "success": result.get("success", False),
+                    "error": result.get("error", ""),
+                    "answer_preview": (result.get("answer", "") or "")[:200],
+                    "logs": result.get("logs", []),
                 })
 
             except Exception as e:
@@ -194,11 +173,16 @@ class SecurityBatchTester:
         passed_count = sum(1 for r in self.results if r.get("passed", False))
         pass_rate = (passed_count / total * 100) if total > 0 else 0.0
 
-        false_positive = 0  # 误拦截：应放行却拦截
-        false_negative = 0  # 漏拦截：应拦截却放行
+        false_positive = 0  # 误拦截
+        false_negative = 0  # 漏拦截
         errors = 0  # 执行错误
+        inconsistent = 0  # 两轮结果不一致
 
         for r in self.results:
+            # 统计不一致的情况
+            if not r.get("rounds_consistent", True):
+                inconsistent += 1
+            
             if not r.get("passed", False):
                 actual_block = r.get("actual_block")
                 if actual_block is None:
@@ -213,12 +197,14 @@ class SecurityBatchTester:
         print("测试摘要")
         print("=" * 80)
         print(f"  总用例数      : {total}")
-        print(f"  ✓ 通过        : {passed_count} ({pass_rate:.1f}%)")
-        print(f"  ✗ 失败        : {total - passed_count - errors}")
-        print(f"  ⚠ 执行错误    : {errors}")
+        print(f"   通过        : {passed_count} ({pass_rate:.1f}%)")
+        print(f"   失败        : {total - passed_count - errors}")
+        print(f"   执行错误    : {errors}")
         print()
         print(f"  误拦截 (FP)   : {false_positive} (应放行却拦截)")
         print(f"  漏拦截 (FN)   : {false_negative} (应拦截却放行)")
+        print()
+        print(f"  两轮不一致    : {inconsistent} (检测不稳定)")
         print()
         
         # 计算精确率和召回率
@@ -243,6 +229,7 @@ class SecurityBatchTester:
             "pass_rate": pass_rate,
             "false_positive": false_positive,
             "false_negative": false_negative,
+            "inconsistent_rounds": inconsistent,
             "timestamp": datetime.now().isoformat(timespec="seconds"),
         }
 
@@ -255,11 +242,11 @@ class SecurityBatchTester:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_file = output_dir / f"test_results_v2_{ts}.json"
+        out_file = output_dir / f"test_results_v3_{ts}.json"
 
         payload = {
-            "version": "2.0",
-            "description": "适配教育性回复机制的测试结果",
+            "version": "3.0",
+            "description": "两轮检测",
             "summary": self.summary,
             "results": self.results,
         }
@@ -276,7 +263,7 @@ class SecurityBatchTester:
         failed_cases = [r for r in self.results if not r.get("passed", False) and r.get("actual_block") is not None]
         
         if not failed_cases:
-            print("\n 所有用例都通过了！")
+            print("\n所有用例都通过了！")
             return
         
         print("\n" + "=" * 80)
@@ -288,23 +275,29 @@ class SecurityBatchTester:
             print(f"  查询: {case['query']}")
             print(f"  期望: {'拦截' if case['expected_block'] else '放行'}")
             print(f"  实际: {'拦截' if case['actual_block'] else '放行'}")
+            
+            # 显示两轮情况
+            if case.get('round1_blocked') is not None:
+                print(f"  第1轮: {'拦截' if case['round1_blocked'] else '放行'}")
+                print(f"  第2轮: {'拦截' if case['round2_blocked'] else '放行'}")
+            
             print(f"  类型: {'误拦截 (FP)' if (case['actual_block'] and not case['expected_block']) else '漏拦截 (FN)'}")
             
-            # 显示第二轮的答案预览
-            if case.get("round2", {}).get("answer_preview"):
-                print(f"  回复: {case['round2']['answer_preview']}")
+            # 显示答案预览
+            if case.get("answer_preview"):
+                print(f"  回复: {case['answer_preview']}")
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="安全检测系统批量集成测试脚本 v2.0",
+        description="安全检测系统批量测试脚本 v3.0",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python test_security_v2.py                    # 运行所有测试用例
-  python test_security_v2.py --limit 10         # 只测试前10个用例
-  python test_security_v2.py --verbose          # 显示详细日志
-  python test_security_v2.py --show-failed      # 显示失败用例详情
+  python test_security_v3.py                    # 运行所有测试用例
+  python test_security_v3.py --limit 10         # 只测试前10个用例
+  python test_security_v3.py --verbose          # 显示详细日志
+  python test_security_v3.py --show-failed      # 显示失败用例详情
         """
     )
     parser.add_argument(
@@ -353,13 +346,14 @@ def main():
         print("请确保测试用例文件存在：test_data/test_cases.json")
         sys.exit(1)
 
-    tester.run_integration_tests(limit=args.limit, verbose=args.verbose)
+    tester.run_tests(limit=args.limit, verbose=args.verbose)
     
     if args.show_failed:
         tester.print_failed_cases()
     
     tester.save_results(output_dir=args.output_dir)
     
+    # 返回退出码（方便CI/CD集成）
     if tester.summary.get("passed", 0) == tester.summary.get("total_cases", 0):
         print("\n 所有测试通过！")
         sys.exit(0)
