@@ -116,6 +116,12 @@ function renderChatList() {
 // 切换会话
 function switchConversation(id) {
     if (id === currentConversationId) return;
+
+    // 若正在思考中，先中止旧请求
+    if (isRequestPending) {
+        stopCurrentRequest();  // 会调用 AbortController.abort()
+    }
+
     const conv = conversations.find(c => c.id === id);
     if (!conv) return;
 
@@ -280,6 +286,10 @@ async function sendMessage() {
         setLoading(false);
 
         if (data.success) {
+            if (conv.id !== currentConversationId) {
+                // 用户在生成期间切换了对话，不渲染这条响应
+                return;
+            }
             appendMessageToCurrent(data.answer, 'bot');
         } else {
             addErrorMessage(data.error || '发生未知错误');
