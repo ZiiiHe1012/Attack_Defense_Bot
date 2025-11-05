@@ -119,7 +119,7 @@ function switchConversation(id) {
 
     // 若正在思考中，先中止旧请求
     if (isRequestPending) {
-        stopCurrentRequest();  // 会调用 AbortController.abort()
+        stopCurrentRequest();  
     }
 
     const conv = conversations.find(c => c.id === id);
@@ -263,9 +263,13 @@ async function sendMessage() {
     const text = input.value.trim();
     if (!text || isRequestPending) return;
 
-    if (!getCurrentConversation()) {
+    // 记录发送前的会话 id
+    let conv = getCurrentConversation();
+    if (!conv) {
         createNewConversation();
+        conv = getCurrentConversation();
     }
+    const convIdAtSend = conv.id;
 
     appendMessageToCurrent(text, 'user');
     input.value = '';
@@ -286,8 +290,8 @@ async function sendMessage() {
         setLoading(false);
 
         if (data.success) {
-            if (conv.id !== currentConversationId) {
-                // 用户在生成期间切换了对话，不渲染这条响应
+            // 如果发送期间用户切换了对话，就不渲染这条回复
+            if (convIdAtSend !== currentConversationId) {
                 return;
             }
             appendMessageToCurrent(data.answer, 'bot');
@@ -295,7 +299,6 @@ async function sendMessage() {
             addErrorMessage(data.error || '发生未知错误');
         }
     } catch (error) {
-        // 主动中止不报错
         if (error.name === 'AbortError') {
             console.log('请求已取消');
             return;
