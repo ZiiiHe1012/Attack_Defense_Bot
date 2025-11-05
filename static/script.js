@@ -516,3 +516,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateSidebarState();
 });
+function changeFavicon() {
+    const timestamp = new Date().getTime();  // 获取当前时间戳
+    const iconPath = '{{ url_for("static", filename="openai.svg") }}?v=' + timestamp;
+    
+    const existingFavicon = document.querySelector("link[rel*='icon']");
+    if (existingFavicon) {
+        existingFavicon.remove();
+    }
+
+    let link = document.createElement('link');
+    link.type = 'image/svg+xml';
+    link.rel = 'icon';
+    link.href = iconPath;
+    document.head.appendChild(link);
+}
+
