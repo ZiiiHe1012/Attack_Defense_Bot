@@ -408,7 +408,7 @@ body {
     position: relative;
     flex: 1;
     display: flex;
-    align-items: center; /* 上下居中按钮 */
+    align-items: center;
 }
 
 #userInput {
@@ -561,19 +561,19 @@ body {
 /* AI在左侧 */
 .bot-message {
     justify-content: flex-start;
-    padding-left: 25%;
+    padding-left: 22%;
 }
 .bot-message .message-content {
-    background: transparent;     /* 完全透明 */
-    border: none;                /* 去掉边框 */
-    box-shadow: none;            /* 去掉阴影 */
-    color: #222;                 /* 保留文字颜色 */
+    background: transparent;     
+    border: none;                
+    box-shadow: none;            
+    color: #222;                 
 }
 
 /* 用户在右侧 */
 .user-message {
     justify-content: flex-end;
-    padding-right: 28%;
+    padding-right: 25%;
 }
 .user-message .message-content {
     background: #f3f3f3;
