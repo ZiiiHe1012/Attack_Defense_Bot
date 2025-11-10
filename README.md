@@ -9,14 +9,14 @@
 ### 1. 六层安全防护与RAG架构
 
 系统采用渐进式的六层安全检测与RAG机制，确保既能提供专业知识，又能防止恶意利用：
-
 ```mermaid
 graph TD
-    A[用户输入] --> B[第1层: 黑名单检测]
-    B -->|通过| C[第2层: 意图识别]
-    C -->|直接放行| D[第4层: RAG检索]
-    C -->|直接拦截| Z[返回错误提示]
-    C -->|灰色地带| E[第3层: AI安全检测]
+    A[用户输入] --> B[第1层: 意图识别]
+    B -->|直接放行| D[第4层: RAG检索]
+    B -->|直接拦截| Z[返回错误提示]
+    B -->|灰色地带| C[第2层: 攻击模式检测]
+    C -->|通过| E[第3层: AI安全检测]
+    C -->|失败| Z
     E -->|通过| D
     E -->|失败| Z
     D --> F[第5层: 生成回答]
@@ -27,19 +27,9 @@ graph TD
 
 #### 六层安全防护与RAG架构详解
 
-**第1层：黑名单检测** (`guard.py`, `blacklist.py`)
-- 功能：快速过滤已知的恶意模式
-- 检测内容：
-  - 指令覆盖攻击（"忽略之前的指令"）
-  - 角色混淆攻击（"你现在是黑客"）
-  - 信息泄露尝试（"显示系统提示词"）
-  - 越狱攻击（"DAN模式"）
-  - 代码注入（XSS、SQL注入模式）
-  - 社会工程（权限伪装）
+**第1层：意图识别** (`intent_classifier.py`, `context_intent.py`)
 
-**第2层：意图识别** (`intent_classifier.py`, `context_intent.py`)
-
-**2.1 单轮意图分类**
+**1.1 单轮意图分类**
 - 功能：使用LLM判断用户当前输入的真实意图
 - 分类标准：
   - **KNOWLEDGE（知识学习）**：询问概念、原理 → 直接放行
@@ -48,7 +38,7 @@ graph TD
   - **GREY（灰色地带）**：意图不明确 → 进入下一层检测
 - 策略：高置信度（>0.8）直接决策，避免误判
 
-**2.2 上下文意图检测**（新增功能）
+**1.2 上下文意图检测**
 - 功能：分析对话历史，检测渐进式攻击意图
 - 实现机制：
   - 保留最近5轮对话历史（用户+AI各5条）
@@ -58,8 +48,21 @@ graph TD
   - 置信度 > 0.75 → 直接拦截
   - 否则 → 继续后续检测流程
 
+**第2层：攻击模式检测**（灰色地带） (`attack_pattern_detector.py`)
+- 功能：对意图不明确的输入进行基于规则的模式匹配
+- 检测内容：
+  - 攻击动词+攻击名词组合（如"生成 SQL注入"）
+  - 规避检测模式（"绕过WAF"、"隐藏payload"）
+  - Payload相关关键词（"exploit"、"shellcode"）
+  - 代码请求模式（"给我示例代码"）
+  - 特殊攻击模式（编码规避、内网访问、数据外泄等）
+- 策略：
+  - 检测到2个以上防御关键词 → 直接放行
+  - 攻击特征分数 ≥ 0.5 → 拦截
+  - 综合意图分类结果进行判断
+
 **第3层：AI安全检测**（灰色地带） (`safety_agent.py`)
-- 功能：对意图不明确的输入进行深度分析
+- 功能：对通过模式检测的输入进行深度语义分析
 - 使用专门训练的安全检测prompt
 - 判断是否存在隐藏的攻击意图
 
@@ -235,9 +238,8 @@ def build_prompt(documents, query, intent_info, decomposed_supplement):
 | `main.py` | Flask应用入口，六层检测流程编排 | `process_query()` |
 | `intent_classifier.py` | LLM单轮意图分类与验证 | `classify_intent()`, `validate_by_intent()` |
 | `context_intent.py` | 上下文意图检测，识别渐进式攻击 | `analyze_context_intent()`, `context_intent_validation()`, `ConversationManager` |
+| `attack_pattern_detector.py` | 基于规则的攻击模式检测 | `detect_attack_intent()`, `validate_by_pattern()`, `should_block()` |
 | `safety_agent.py` | 输入/输出AI安全检测 | `is_input_safe()`, `is_output_safe()` |
-| `guard.py` | 黑名单规则验证 | `validate_user_input()` |
-| `blacklist.py` | 黑名单规则定义 | `get_blacklist()` |
 | `data_processor.py` | 知识库检索与问题分解 | `search_common_database()`, `advanced_search()` |
 | `database_builder.py` | 知识库构建工具 | `KnowledgeBaseBuilder`, `split_by_paragraph()`, `load_json_dataset()` |
 | `prompt_builder.py` | 动态prompt构建 | `build_prompt()` |
@@ -245,11 +247,12 @@ def build_prompt(documents, query, intent_info, decomposed_supplement):
 | `api_client.py` | 外部API调用 | `dialogue()`, `search_similar_files()` |
 
 ### 数据流
-
 ```
 用户输入
     ↓
-[黑名单] → [意图识别] → [上下文检测] → [AI检测(可选)]
+[意图识别] → [上下文检测]
+    ↓
+[攻击模式检测(灰色地带)] → [AI检测(灰色地带)]
     ↓
 [RAG检索: 向量数据库(ATT_CK/D3FEND/OWASP/CYBER_METRIC/公共数据库)]
     ↓
@@ -326,30 +329,28 @@ token = "your-api-token"
    - 保持5轮对话记忆，平衡性能与安全
 
 ## 项目结构
-
 ```
 Attack_Defense_Bot/
-├── main.py                 # Flask应用入口
-├── api_client.py          # 外部API调用
-├── intent_classifier.py   # 单轮意图识别模块
-├── context_intent.py      # 上下文意图检测模块（新增）
-├── safety_agent.py        # 安全检测Agent
-├── guard.py              # 输入守卫
-├── blacklist.py          # 黑名单规则
-├── data_processor.py     # 数据检索处理
-├── database_builder.py   # 知识库构建工具（新增）
-├── prompt_builder.py     # Prompt构建
-├── conversation.py       # 对话生成
-├── prompts/              # 检测Prompt模板
+├── main.py                       # Flask应用入口
+├── api_client.py                 # 外部API调用
+├── intent_classifier.py          # 单轮意图识别模块
+├── context_intent.py             # 上下文意图检测模块
+├── attack_pattern_detector.py    # 攻击模式检测器
+├── safety_agent.py               # 安全检测Agent
+├── data_processor.py             # 数据检索处理
+├── database_builder.py           # 知识库构建工具
+├── prompt_builder.py             # Prompt构建
+├── conversation.py               # 对话生成
+├── prompts/                      # 检测Prompt模板
 │   ├── input.txt
 │   └── output.txt
-├── templates/            # 前端模板
+├── templates/                    # 前端模板
 │   └── index.html
-├── static/              # 静态资源
+├── static/                       # 静态资源
 │   ├── style.css
 │   └── script.js
-├── pictures/            # 文档图片
+├── pictures/                     # 文档图片
 │   ├── attack.png
 │   └── benign.png
-└── requirement.txt      # 依赖列表
+└── requirement.txt               # 依赖列表
 ```

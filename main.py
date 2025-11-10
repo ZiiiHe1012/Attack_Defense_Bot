@@ -1,11 +1,12 @@
 from flask import Flask, render_template, request, jsonify
 from prompt_builder import build_prompt, RAG_ANSWER_PROMPT, RAG_ADVANCED_ANSWER_PROMPT, build_prompt, RAG_ANSWER_PROMPT_V2
-from data_processor import search_common_database, advanced_search,search_database_bilingual
+from data_processor import search_common_database, advanced_search, search_database_bilingual
 from conversation import answerLM
 from guard import validate_user_input, validate_prompt
 from intent_classifier import validate_by_intent, get_intent_label, classify_intent
 from safety_agent import is_input_safe, is_output_safe
 from context_intent import context_intent_validation, ConversationManager
+from attack_pattern_detector import validate_by_pattern  # 新增导入
 
 app = Flask(__name__)
 conversation_manager = ConversationManager(max_turns=5)
@@ -29,46 +30,39 @@ def process_query(q: str) -> dict:
         "error": "",
         "logs": []
     }
-
-    # 第1层：黑名单
-    result["logs"].append({"step": "黑名单", "status": "processing", "message": "检测中..."})
-    pass_blacklist, blacklist_msg = validate_user_input(q)
-    if not pass_blacklist:
-        result["logs"].append({"step": "黑名单", "status": "fail", "message": blacklist_msg})
-        result["error"] = f"检测到不安全输入: {blacklist_msg}"
-        return result
-    result["logs"].append({"step": "黑名单", "status": "success", "message": blacklist_msg})
     
-    # 第2层：意图识别
+    # 第1层：意图识别
     result["logs"].append({"step": "意图识别", "status": "processing", "message": "识别中..."})
     # 先获取完整的意图信息（用于后续输出检测）
     intent_result = classify_intent(q)
-    # 进行上下文意图验证
-    result["logs"].append({"step": "上下文检测", "status": "processing", "message": "检查中..."})
-    is_safe, reason, _ = context_intent_validation(q, conversation_manager.get_history())
-    if is_safe is False:
-        result["logs"].append({"step": "上下文检测", "status": "fail", "message": reason})
-        result["error"] = reason
-        return result
-    result["logs"].append({"step": "上下文检测", "status": "success", "message": reason})
     # 再进行本次意图验证（决定是否放行/拦截/进入AI检测）
     intent_validation = validate_by_intent(q)
     # 直接放行
     if intent_validation[0] is True:
         result["logs"].append({"step": "意图识别", "status": "success", "message": intent_validation[1]})
-        need_ai_check = False
+        need_further_check = False
     # 直接拦截
     elif intent_validation[0] is False:
         result["logs"].append({"step": "意图识别", "status": "fail", "message": intent_validation[1]})
         result["error"] = intent_validation[1] + "\n\n建议：您可以询问漏洞原理、防御措施等教育性内容。"
         return result
-    # 灰色地带
+    # 灰色地带, 需要进一步检测
     else:
         result["logs"].append({"step": "意图识别", "status": "warning", "message": get_intent_label(intent_result)})
-        need_ai_check = True
+        need_further_check = True
+    
+    # 第2层：攻击模式检测
+    if need_further_check:
+        result["logs"].append({"step": "攻击模式检测", "status": "processing", "message": "检测中..."})
+        pass_pattern, pattern_msg = validate_by_pattern(q, intent_result)
+        if not pass_pattern:
+            result["logs"].append({"step": "攻击模式检测", "status": "fail", "message": pattern_msg})
+            result["error"] = pattern_msg + "\n\n建议：请使用更明确的防御性表述。"
+            return result
+        result["logs"].append({"step": "攻击模式检测", "status": "success", "message": pattern_msg})
     
     # 第3层：AI安全检测（灰色地带）
-    if need_ai_check:
+    if need_further_check:
         result["logs"].append({"step": "AI安全检测", "status": "processing", "message": "检测中..."})
         if not is_input_safe(q):
             result["logs"].append({"step": "AI安全检测", "status": "fail", "message": "检测到可疑意图"})
