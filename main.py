@@ -6,7 +6,7 @@ from guard import validate_user_input, validate_prompt
 from intent_classifier import validate_by_intent, get_intent_label, classify_intent
 from safety_agent import is_input_safe, is_output_safe
 from context_intent import context_intent_validation, ConversationManager
-from attack_pattern_detector import validate_by_pattern  # 新增导入
+from attack_pattern_detector import validate_by_pattern
 
 app = Flask(__name__)
 conversation_manager = ConversationManager(max_turns=5)
